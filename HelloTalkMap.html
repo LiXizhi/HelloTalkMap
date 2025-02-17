@@ -136,7 +136,7 @@
   <div id="avatar-container"></div>
 
   <script>
-    let map, panorama, geocoder, placesService, avatarModel, mixer;
+    let map, panorama, geocoder, placesService, avatarModel, mixer, camera;
 
     function initMap() {
       // Initialize the map
@@ -176,6 +176,9 @@
 
       // Add event listeners for WASD keys
       document.addEventListener("keydown", handleKeyDown);
+
+      // Add event listener for mouse wheel to zoom in/out on the Street View panorama
+      panorama.addListener('pov_changed', handlePovEvent);
     }
 
     function adjustView(direction) {
@@ -227,7 +230,7 @@
     function initAvatar() {
       const container = document.getElementById('avatar-container'); // Attach to avatar-container
       const scene = new THREE.Scene();
-      const camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
+      camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
       const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); // Enable alpha for transparency
       renderer.setSize(container.clientWidth, container.clientHeight);
       renderer.setClearColor(0x000000, 0); // Set background to transparent
@@ -274,8 +277,11 @@
       renderer.domElement.style.pointerEvents = 'none';
     }
 
+    // Add event listener for mouse wheel to zoom in/out on the map
+    //document.getElementById('street-view').addEventListener('wheel', handleMouseWheel);
+
     function handleKeyDown(event) {
-      if (!avatarModel) return;
+      if (!avatarModel || !camera) return;
 
       switch (event.key) {
         case "w":
@@ -293,6 +299,19 @@
         default:
           return;
       }
+    }
+
+    function handlePovEvent(event) {
+      if (!camera) return;
+      // Get the current zoom level of the Street View panorama
+      const zoomLevel = panorama.getZoom();
+      // Get the current pitch value of the Street View panorama
+      const pitch = panorama.getPov().pitch;
+      // Adjust the camera's field of view based on the zoom level
+      camera.fov = 150 / (zoomLevel);
+      // Adjust the camera's pitch based on the panorama's current pitch value
+      camera.rotation.x = THREE.Math.degToRad(pitch);
+      camera.updateProjectionMatrix();
     }
 
     window.onload = function() {
