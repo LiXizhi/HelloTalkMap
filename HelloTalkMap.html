@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Google Street View with WSAD Controls</title>
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCZyX7wlZ8OYbboF82yqPSXoPuSaJ-nECk&libraries=places&callback=initMap" async defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+  <style>
+    /* Layout styles */
+    body {
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    #search-bar {
+      display: flex;
+      padding: 10px;
+      background-color: #f8f8f8;
+      border-bottom: 1px solid #ddd;
+    }
+
+    #search-input {
+      flex: 1;
+      padding: 10px;
+      font-size: 16px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+
+    #search-button {
+      padding: 10px 20px;
+      margin-left: 10px;
+      font-size: 16px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    #search-button:hover {
+      background-color: #0056b3;
+    }
+
+    #map-container {
+      display: flex;
+      flex: 1;
+    }
+
+    #map {
+      width: 50%;
+      height: 100%;
+    }
+
+    #street-view {
+      width: 50%;
+      height: 100%;
+      position: relative;
+    }
+
+    /* WSAD Controls */
+    .wsad-controls {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: grid;
+      grid-template-columns: 50px 50px 50px;
+      gap: 5px;
+      z-index: 1000;
+    }
+
+    .wsad-controls button {
+      width: 50px;
+      height: 50px;
+      background-color: #ffffff;
+      border: 2px solid #cccccc;
+      border-radius: 5px;
+      font-size: 18px;
+      font-weight: bold;
+      cursor: pointer;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    }
+
+    .wsad-controls button:hover {
+      background-color: #f0f0f0;
+    }
+
+    .wsad-controls button:active {
+      background-color: #e0e0e0;
+    }
+
+    .wsad-controls .spacer {
+      visibility: hidden;
+    }
+
+    #avatar-container {
+      position: absolute;
+      top: 0%;
+      left: 50%;
+      width: 50%;
+      height: 100%;
+      /*transform: translate(-50%, -50%);*/
+      z-index: 100;
+      pointer-events: none; /* Make sure the container does not block interactions */
+    }
+  </style>
+</head>
+<body>
+  <!-- Search Bar -->
+  <div id="search-bar">
+    <input id="search-input" type="text" placeholder="Search for a location..." />
+    <button id="search-button">Search</button>
+  </div>
+
+  <!-- Map and Street View Container -->
+  <div id="map-container">
+    <div id="map"></div>
+    <div id="street-view">
+      <!-- WSAD Controls -->
+      <div class="wsad-controls">
+        <div class="spacer"></div>
+        <button id="up">W</button>
+        <div class="spacer"></div>
+        <button id="left">A</button>
+        <button id="down">S</button>
+        <button id="right">D</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="avatar-container"></div>
+
+  <script>
+    let map, panorama, geocoder, placesService, avatarModel, mixer;
+
+    function initMap() {
+      // Initialize the map
+      const initialLocation = { lat: 37.7749, lng: -122.4194 }; // San Francisco, CA
+      map = new google.maps.Map(document.getElementById("map"), {
+        center: initialLocation,
+        zoom: 14,
+      });
+
+      // Initialize the Street View panorama
+      panorama = new google.maps.StreetViewPanorama(document.getElementById("street-view"), {
+        position: initialLocation,
+        pov: {
+          heading: 0,
+          pitch: 0,
+        },
+        zoom: 1,
+        disableDefaultUI: true,
+        showRoadLabels: false,
+      });
+
+      // Link the map and Street View
+      map.setStreetView(panorama);
+
+      // Initialize the geocoder and places service
+      geocoder = new google.maps.Geocoder();
+      placesService = new google.maps.places.PlacesService(map);
+
+      // Add event listeners for WSAD buttons
+      document.getElementById("up").addEventListener("click", () => adjustView("up"));
+      document.getElementById("down").addEventListener("click", () => adjustView("down"));
+      document.getElementById("left").addEventListener("click", () => adjustView("left"));
+      document.getElementById("right").addEventListener("click", () => adjustView("right"));
+
+      // Add event listener for the search button
+      document.getElementById("search-button").addEventListener("click", searchLocation);
+
+      // Add event listeners for WASD keys
+      document.addEventListener("keydown", handleKeyDown);
+    }
+
+    function adjustView(direction) {
+      if (!panorama) return;
+
+      // Get the current POV (point of view)
+      const pov = panorama.getPov();
+
+      // Adjust heading and pitch based on the direction
+      switch (direction) {
+        case "up":
+          pov.pitch = Math.min(pov.pitch + 5, 90); // Move up (max pitch: 90)
+          break;
+        case "down":
+          pov.pitch = Math.max(pov.pitch - 5, -90); // Move down (min pitch: -90)
+          break;
+        case "left":
+          pov.heading = (pov.heading - 5 + 360) % 360; // Rotate left
+          break;
+        case "right":
+          pov.heading = (pov.heading + 5) % 360; // Rotate right
+          break;
+        default:
+          return; // Ignore other inputs
+      }
+
+      // Update the panorama's POV
+      panorama.setPov(pov);
+    }
+
+    function searchLocation() {
+      const query = document.getElementById("search-input").value;
+      if (!query) return;
+
+      // Use the Places API to search for the location
+      placesService.textSearch({ query }, (results, status) => {
+        if (status === google.maps.places.PlacesServiceStatus.OK && results[0]) {
+          const location = results[0].geometry.location;
+
+          // Update the map and Street View to the new location
+          map.setCenter(location);
+          panorama.setPosition(location);
+        } else {
+          alert("Location not found. Please try again.");
+        }
+      });
+    }
+
+    function initAvatar() {
+      const container = document.getElementById('avatar-container'); // Attach to avatar-container
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); // Enable alpha for transparency
+      renderer.setSize(container.clientWidth, container.clientHeight);
+      renderer.setClearColor(0x000000, 0); // Set background to transparent
+      container.appendChild(renderer.domElement);
+
+      const light = new THREE.AmbientLight(0x404040);
+      scene.add(light);
+
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+      directionalLight.position.set(1, 1, 1).normalize();
+      scene.add(directionalLight);
+
+      const loader = new THREE.GLTFLoader();
+      loader.load('https://api.keepwork.com/ts-storage/siteFiles/44128/raw#lixizhi_stand.glb', function (gltf) {
+        avatarModel = gltf.scene;
+        scene.add(avatarModel);
+        avatarModel.position.set(0, -1, 0);
+        avatarModel.scale.set(0.5, 0.5, 0.5);
+
+        mixer = new THREE.AnimationMixer(avatarModel);
+        const action = mixer.clipAction(gltf.animations[0]);
+        action.play();
+      }, undefined, function (error) {
+        console.error(error);
+      });
+
+      camera.position.z = 2;
+
+      function animate() {
+        requestAnimationFrame(animate);
+        if (mixer) mixer.update(0.01); // Update the animation mixer
+        renderer.render(scene, camera);
+      }
+      animate();
+
+      // Resize renderer on window resize
+      window.addEventListener('resize', () => {
+        camera.aspect = container.clientWidth / container.clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(container.clientWidth, container.clientHeight);
+      });
+
+      // Ensure the avatar canvas does not capture key or mouse input
+      renderer.domElement.style.pointerEvents = 'none';
+    }
+
+    function handleKeyDown(event) {
+      if (!avatarModel) return;
+
+      switch (event.key) {
+        case "w":
+          avatarModel.position.z -= 0.1; // Move forward
+          break;
+        case "s":
+          avatarModel.position.z += 0.1; // Move backward
+          break;
+        case "a":
+          avatarModel.position.x -= 0.1; // Move left
+          break;
+        case "d":
+          avatarModel.position.x += 0.1; // Move right
+          break;
+        default:
+          return;
+      }
+    }
+
+    window.onload = function() {
+      initMap();
+      initAvatar();
+    };
+  </script>
+</body>
+</html>
