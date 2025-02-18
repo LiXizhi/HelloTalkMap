@@ -196,10 +196,10 @@
           pov.pitch = Math.max(pov.pitch - 5, -90); // Move down (min pitch: -90)
           break;
         case "left":
-          pov.heading = (pov.heading - 5 + 360) % 360; // Rotate left
+          //pov.heading = (pov.heading - 5 + 360) % 360; // Rotate left
           break;
         case "right":
-          pov.heading = (pov.heading + 5) % 360; // Rotate right
+          //pov.heading = (pov.heading + 5) % 360; // Rotate right
           break;
         default:
           return; // Ignore other inputs
@@ -244,18 +244,38 @@
       scene.add(directionalLight);
 
       const loader = new THREE.GLTFLoader();
-      loader.load('https://api.keepwork.com/ts-storage/siteFiles/44128/raw#lixizhi_stand.glb', function (gltf) {
-        avatarModel = gltf.scene;
-        scene.add(avatarModel);
-        avatarModel.position.set(0, -1, 0);
-        avatarModel.scale.set(0.5, 0.5, 0.5);
+      const cachedGLB = localStorage.getItem('cachedGLB');
 
-        mixer = new THREE.AnimationMixer(avatarModel);
-        const action = mixer.clipAction(gltf.animations[0]);
-        action.play();
-      }, undefined, function (error) {
-        console.error(error);
-      });
+      if (cachedGLB) {
+        const arrayBuffer = new Uint8Array(JSON.parse(cachedGLB)).buffer;
+        loader.parse(arrayBuffer, '', function (gltf) {
+          avatarModel = gltf.scene;
+          scene.add(avatarModel);
+          avatarModel.position.set(0, -1, 0);
+          avatarModel.scale.set(0.5, 0.5, 0.5);
+
+          mixer = new THREE.AnimationMixer(avatarModel);
+          const action = mixer.clipAction(gltf.animations[0]);
+          action.play();
+        });
+      } else {
+        loader.load('https://api.keepwork.com/ts-storage/siteFiles/44128/raw#lixizhi_stand.glb', function (gltf) {
+          avatarModel = gltf.scene;
+          scene.add(avatarModel);
+          avatarModel.position.set(0, -1, 0);
+          avatarModel.scale.set(0.5, 0.5, 0.5);
+
+          mixer = new THREE.AnimationMixer(avatarModel);
+          const action = mixer.clipAction(gltf.animations[0]);
+          action.play();
+
+          // Cache the GLB file
+          const glbData = new Uint8Array(gltf.parser.extensions['KHR_binary_glTF'].body);
+          localStorage.setItem('cachedGLB', JSON.stringify(Array.from(glbData)));
+        }, undefined, function (error) {
+          console.error(error);
+        });
+      }
 
       camera.position.z = 2;
 
@@ -291,10 +311,10 @@
           avatarModel.position.z += 0.1; // Move backward
           break;
         case "a":
-          avatarModel.position.x -= 0.1; // Move left
+          avatarModel.rotation.y += 0.1; // Rotate left
           break;
         case "d":
-          avatarModel.position.x += 0.1; // Move right
+          avatarModel.rotation.y -= 0.1; // Rotate right
           break;
         default:
           return;
@@ -307,11 +327,10 @@
       const zoomLevel = panorama.getZoom();
       // Get the current pitch value of the Street View panorama
       const pitch = panorama.getPov().pitch;
-      // Adjust the camera's field of view based on the zoom level
-      camera.fov = 150 / (zoomLevel);
+      // Adjust the camera's distance to the object based on the zoom level
+      camera.position.z = 5 / (zoomLevel*zoomLevel); // Adjust the divisor to control the zoom sensitivity
       // Adjust the camera's pitch based on the panorama's current pitch value
       camera.rotation.x = THREE.Math.degToRad(pitch);
-      camera.updateProjectionMatrix();
     }
 
     window.onload = function() {
