@@ -66,21 +66,20 @@
     .wsad-controls {
       position: absolute;
       bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
+      left: 20px;
       display: grid;
-      grid-template-columns: 50px 50px 50px;
-      gap: 5px;
+      grid-template-columns: 25px 25px 25px; /* 50% of original size */
+      gap: 2.5px; /* 50% of original gap */
       z-index: 1000;
     }
 
     .wsad-controls button {
-      width: 50px;
-      height: 50px;
+      width: 25px; /* 50% of original size */
+      height: 25px; /* 50% of original size */
       background-color: #ffffff;
       border: 2px solid #cccccc;
       border-radius: 5px;
-      font-size: 18px;
+      font-size: 9px; /* 50% of original size */
       font-weight: bold;
       cursor: pointer;
       box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
@@ -108,6 +107,23 @@
       z-index: 100;
       pointer-events: none; /* Make sure the container does not block interactions */
     }
+
+    .gm-style-cc, .gmnoprint, .gm-bundled-control {
+      display: none !important;
+    }
+
+    #size-slider-container {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+    }
+
+    #size-slider {
+      width: 150px;
+    }
   </style>
 </head>
 <body>
@@ -134,6 +150,10 @@
   </div>
 
   <div id="avatar-container"></div>
+  <div id="size-slider-container">
+    <label for="size-slider">Avatar Size:</label>
+    <input type="range" id="size-slider" min="0.2" max="2" step="0.1" value="0.5">
+  </div>
 
   <script>
     let map, panorama, geocoder, placesService, avatarModel, mixer, camera;
@@ -295,6 +315,14 @@
 
       // Ensure the avatar canvas does not capture key or mouse input
       renderer.domElement.style.pointerEvents = 'none';
+
+      const sizeSlider = document.getElementById('size-slider');
+      sizeSlider.addEventListener('input', () => {
+        const scale = parseFloat(sizeSlider.value);
+        if (avatarModel) {
+          avatarModel.scale.set(scale, scale, scale);
+        }
+      });
     }
 
     // Add event listener for mouse wheel to zoom in/out on the map
@@ -305,10 +333,10 @@
 
       switch (event.key) {
         case "w":
-          avatarModel.position.z -= 0.1; // Move forward
+          //avatarModel.position.z -= 0.1; // Move forward
           break;
         case "s":
-          avatarModel.position.z += 0.1; // Move backward
+          //avatarModel.position.z += 0.1; // Move backward
           break;
         case "a":
           avatarModel.rotation.y += 0.1; // Rotate left
